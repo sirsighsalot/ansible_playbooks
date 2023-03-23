@@ -1,0 +1,17 @@
+---
+
+- name: Automate "Stare and Compare" for Cisco Routers
+  hosts: Target IP
+  gather_facts: false
+  tasks:
+  - name: Capture pre-change Router configuration
+    ios_command: 
+      commands:
+        - show run
+    register: pre_change_config
+
+  - name: Save pre-change to a file in directory
+    delegate_to: localhost
+    copy: 
+      content: "{{pre_change_config.stdout[0]}}"
+      dest: "/chosen_directory/{{inventory_hostname}}_precheck.txt"

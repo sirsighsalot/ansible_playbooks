@@ -1,0 +1,50 @@
+---
+
+- name: Automate "Stare and Compare" for Cisco Router
+  hosts: all
+  vars:
+    file1_path: /chosen_directory/{{inventory_hostname}}_precheck.txt
+    file2_path: /chosen_directory/{{inventory_hostname}}_postcheck.txt
+    diff_output_path: /chosen_directory/{{inventory_hostname}}_diff_output.txt
+  gather_facts: false
+  
+  tasks:
+  - name: Capture post-change Router configuration
+    ios_command:
+      commands:
+        - show run
+    register: post_change_config
+
+  - name: Save post-change to a file in directory
+    copy: 
+      content: "{{post_change_config.stdout[0]}}"
+      dest: "/chosen_directory/{{inventory_hostname}}_postcheck.txt"
+
+  - name: Read contents of file1
+    delegate_to: localhost
+    ansible.builtin.slurp:
+      src: "{{file1_path}}"
+    register: file1_contents
+
+  - name: Read contents of file2
+    delegate_to: localhost
+    ansible.builtin.slurp:
+      src: "{{file2_path}}"
+    register: file2_contents
+
+  - name: Compare files and save differences to a file
+    ansible.builtin.shell:
+      cmd: "diff -u {{ file1_path }} {{ file2_path }}"
+    register: diff_result
+    failed_when: "diff_result.rc > 1"
+    changed_when: false
+
+  - name: Display comparison result
+    debug:
+      msg: "The contents of file1 and file2 for {{inventory_hostname}} are identical: {{ diff_result.stdout == '' }}"
+
+  - name: Save differences to a file
+    when: diff_result.stdout != ''
+    ansible.builtin.copy:
+      content: "{{ diff_result.stdout }}"
+      dest: "{{ diff_output_path }}"
